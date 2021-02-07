@@ -1,14 +1,15 @@
 #include <vector>
-#include <iostream>
 #include <cmath>
-#include <limits>
 #include "tgaimage.h"
+#include "model.h"
+#include "geometry.h"
 
-const int width  = 100;
-const int height = 100;
-
-const TGAColor red = TGAColor(255, 0, 0, 255);
 const TGAColor white = TGAColor(255, 255, 255, 255);
+const TGAColor red   = TGAColor(255, 0,   0,   255);
+Model *model = NULL;
+
+const int width  = 800;
+const int height = 800;
 
 void line(int x0, int y0, int x1, int y1, TGAImage &img, TGAColor color) {
     bool transpose = false; 
@@ -24,8 +25,8 @@ void line(int x0, int y0, int x1, int y1, TGAImage &img, TGAColor color) {
         std::swap(y0, y1); 
     } 
 
-    int dx = x1 - x0;
-    int dy = y1 - y0;
+    int dx = std::abs(x1 - x0);
+    int dy = std::abs(y1 - y0);
 
     int error = 2 * dy - dx;
     int dn = error + dx;
@@ -48,28 +49,57 @@ void line(int x0, int y0, int x1, int y1, TGAImage &img, TGAColor color) {
     } 
 }
 
+Vec3f normalize(Vec3f values) {
+    int oldMax = 1;
+    int oldMin = -1;
+
+    int newMin = 0;
+    int newXMax = width;
+    int newYMax = height;
+
+    int oldRange = (oldMax - oldMin);
+
+    int newXRange = (newXMax - newMin);
+    int newYRange = (newYMax - newMin);
+
+    int newXValue = (((values.x - oldMin) * newXRange) / oldRange) + newMin;
+    int newYValue = (((values.y - oldMin) * newYRange) / oldRange) + newMin;
+
+    Vec3f normalized;
+    normalized.z = values.z;
+    normalized.x = newXValue;
+    normalized.y = newYValue;
+    return normalized;
+}
+
+
 int main(int argc, char** argv) {
     TGAImage image(width, height, TGAImage::RGB);
+    
+    model = new Model("../src/test.obj");
 
-    unsigned t0, t1;
-    t0=clock();
+    for(int i = 0; i < model->nfaces(); i++){
+        std::vector<int> face = model->face(i);
+        for(int j = 0; j < 3; j++) {
+            Vec3f v0 = model->vert(face[j]);
+            Vec3f v1 = model->vert(face[(j + 1) % 3]);
 
-    for (int i = 0; i < 30000000; i++) {
-        line(13, 20, 80, 40, image, white);
+            Vec3f v0Normalized = normalize(v0);
+            Vec3f v1Normalized = normalize(v1);
+
+            int x0 = v0Normalized.x;
+            int y0 = v0Normalized.y;
+
+            int x1 = v1Normalized.x;
+            int y1 = v1Normalized.y;
+
+            line(x0, y0, x1, y1, image, white);
+        }
     }
-
-    t1 = clock();
-    double time = (double(t1-t0)/CLOCKS_PER_SEC);
-    printf("Execution Time: %f \n", time);
-
-    line(10, 10, 10, 90, image, white);
-    line(10, 10, 90, 10, image, white);
-    line(13, 20, 80, 40, image, white);
-    line(20, 13, 40, 80, image, white);
-
-    line(90, 90, 10, 10, image, red);
 
     image.flip_vertically();
     image.write_tga_file("output.tga");
 
-} 
+    return 0;
+}
+
